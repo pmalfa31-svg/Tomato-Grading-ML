@@ -14,8 +14,7 @@ Raw sensor readings are aggregated into a fixed-size statistical feature vector 
 
 Model evaluation focuses on standard classification metrics (accuracy, precision, recall, F1, confusion matrix), with particular attention to minimizing false negatives on non-conforming product.
 
-For production deployment, the model is trained in Python and exported (ONNX) for inference through a lightweight C/C++ runtime, keeping the training/experimentation stack decoupled from the real-time control loop. See [`docs/architecture.md`](docs/architecture.md) for details.
-
+For production deployment, the model is trained in Python and exported (ONNX) for inference through a lightweight C/C++ runtime, keeping the training/experimentation stack decoupled from the real-time control loop. 
 ## Project status
 
 | Stage | Status |
