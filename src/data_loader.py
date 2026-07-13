@@ -15,10 +15,10 @@ CLASS_MAPPING = {
     "16": {"label": 7, "name": "Pomodorino Verde Scuro Sfumato", "is_cherry": 1}
 }
 
-def load_and_process_dataset(raw_data_dir="data/raw"):
+def load_and_process_dataset(raw_data_dir="data/raw", processed_data_dir="data/processed"):
     """
-    Scansiona le cartelle dei dati grezzi, pulisce il rumore del sensore ottico
-    e aggrega le misurazioni line-scan in feature tabellari per singolo frutto.
+    Scansiona le cartelle dei dati grezzi, pulisce il rumore del sensore ottico,
+    aggrega le misurazioni in feature tabellari per singolo frutto e salva il dataset pulito.
     """
     print(f"[INFO] Scansione file CSV in corso nella cartella: {raw_data_dir}...")
     
@@ -35,7 +35,7 @@ def load_and_process_dataset(raw_data_dir="data/raw"):
         file_name = os.path.basename(file_path)
         prefix = file_name[:2]
         
-        # Se il prefisso non è nella nostra lista standard (es. file di prova strani), lo saltiamo con un avviso
+        # Se il prefisso non è nella nostra lista standard, lo saltiamo con un avviso
         if prefix not in CLASS_MAPPING:
             print(f"[WARNING] File ignorato (prefisso '{prefix}' non riconosciuto): {file_name}")
             continue
@@ -55,15 +55,9 @@ def load_and_process_dataset(raw_data_dir="data/raw"):
         if num_cols >= 17:
             validity_col = 16
         else:
-            # Se è uno dei file esportati a 16 colonne (senza flag), assumiamo che siano già state pulite
             validity_col = None
             
-        # Rinominiamo le colonne chiave per facilitare la lettura del codice
-        # Col 1: frame_id | Col 4: transit_len | Col 8: IR1 | Col 9: IR2 | Col 10: Green
-        # Col 11: Red | Col 12: Blue | Col 13: IR3 | Col 14: SAT | Col 15: HUE
-        
-        # REGOLA D'ORO #2: Identifichiamo l'inizio di ogni singolo frutto
-        # Quando la colonna 1 (frame_id) vale 1, significa che la fotocellula ha visto un nuovo frutto
+        # REGOLA D'ORO #2: Identifichiamo l'inizio di ogni singolo frutto (frame_id == 1)
         df['is_new_fruit'] = (df[1] == 1).astype(int)
         df['local_fruit_id'] = df['is_new_fruit'].cumsum()
         
@@ -75,14 +69,14 @@ def load_and_process_dataset(raw_data_dir="data/raw"):
             else:
                 valid_frames = fruit_group
                 
-            # Se un frutto ha generato solo frame invalidi (rumore puro), lo scartiamo
+            # Se un frutto ha generato solo frame invalidi, lo scartiamo
             if len(valid_frames) == 0:
                 continue
                 
             global_tomato_counter += 1
             unique_id = f"tomato_{global_tomato_counter:04d}"
             
-            # Calcoliamo le medie e deviazioni standard dei canali (Simulazione streaming O(1))
+            # Calcoliamo le medie e deviazioni standard dei canali
             mean_vals = valid_frames[[8, 9, 10, 11, 12, 13, 14, 15]].mean()
             std_vals = valid_frames[[8, 9, 10, 11, 12, 13, 14, 15]].std().fillna(0)
             
@@ -110,7 +104,7 @@ def load_and_process_dataset(raw_data_dir="data/raw"):
                 "SAT_mean": mean_vals[14],
                 "HUE_mean": mean_vals[15],
                 
-                # Deviazioni standard (disomogeneità della buccia / macchie)
+                # Deviazioni standard
                 "IR1_std": std_vals[8],
                 "Green_std": std_vals[10],
                 "Red_std": std_vals[11],
@@ -118,8 +112,7 @@ def load_and_process_dataset(raw_data_dir="data/raw"):
                 "HUE_std": std_vals[15],
             }
             
-            # Calcolo degli Indici di Maturazione e Lesione di Dominio
-            # Aggiungiamo 1e-5 (un numero piccolissimo) al denominatore per evitare divisioni per zero
+            # Calcolo degli Indici di Maturazione e Normalizzazione
             tomato_feature_row["Red_Green_ratio"] = tomato_feature_row["Red_mean"] / (tomato_feature_row["Green_mean"] + 1e-5)
             tomato_feature_row["IR1_IR2_ratio"] = tomato_feature_row["IR1_mean"] / (tomato_feature_row["IR2_mean"] + 1e-5)
             tomato_feature_row["IR3_IR2_ratio"] = tomato_feature_row["IR3_mean"] / (tomato_feature_row["IR2_mean"] + 1e-5)
@@ -128,13 +121,22 @@ def load_and_process_dataset(raw_data_dir="data/raw"):
             
     # Trasformiamo la lista in un DataFrame pandas
     features_df = pd.DataFrame(all_tomatoes)
-    print(f"\n[SUCCESS] Elaborazione completata! Estratti {len(features_df)} pomodori puliti da {len(csv_files)} file CSV.")
+    
+    # --- NUOVO BLOCCO: SALVATAGGIO NELLA CARTELLA DATA/PROCESSED ---
+    os.makedirs(processed_data_dir, exist_ok=True)
+    output_file_path = os.path.join(processed_data_dir, "tomatoes_features.csv")
+    
+    # Esportiamo il CSV (index=False evita di salvare la colonna numerica di indice di pandas)
+    features_df.to_csv(output_file_path, index=False)
+    print(f"\n[SUCCESS] Dataset salvato su disco in: {output_file_path}")
+    # -----------------------------------------------------------------
+    
+    print(f"[INFO] Elaborazione completata! Estratti {len(features_df)} pomodori puliti da {len(csv_files)} file CSV.")
     return features_df
 
-# Blocco di test per verificare che lo script funzioni quando lo esegui da terminale
 if __name__ == "__main__":
-    # Eseguiamo il test di caricamento
-    dataset = load_and_process_dataset("data/raw")
+    # Eseguiamo il test di caricamento e salvataggio
+    dataset = load_and_process_dataset("data/raw", "data/processed")
     
     print("\n=== ANTEPRIMA DEL DATASET ELABORATO ===")
     print(dataset[["tomato_id", "class_name", "transit_len", "HUE_mean", "Red_Green_ratio"]].head(5))
