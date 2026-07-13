@@ -14,7 +14,7 @@ Il software elabora in tempo reale i profili spettrali di frutti (pomodori stand
 
 L'architettura software è strutturata in tre stadi modulari e disaccoppiati, progettati per trasformare il segnale ottico grezzo in codice nativo per microcontrollori o PLC industriali:
 
-'''text
+```text
 [ Line-Scan Optical Sensor ]
              |
              v
@@ -37,12 +37,12 @@ L'architettura software è strutturata in tre stadi modulari e disaccoppiati, pr
              |
              v
 [ Pure C/C++ Header: tomato_classifier.h   ] ──> Esecuzione su STM32 / PLC
-
+```
 ---
 
 ## Repository Structure
 
-'''text
+```text
 TOMATO-GRADING-ML/
 │
 ├── .gitignore                              # Esclusione di ambienti virtuali e file di sistema
@@ -65,7 +65,7 @@ TOMATO-GRADING-ML/
     ├── data_loader.py                      # Pipeline di pulizia, filtrazione hardware e sessionization
     ├── train_model.py                      # Addestramento Random Forest e validazione GroupKFold
     └── export_embedded.py                  # Traduttore da modello in memoria a codice embedded C
-
+```
 ---
 
 ## Data Processing & Streaming Math
