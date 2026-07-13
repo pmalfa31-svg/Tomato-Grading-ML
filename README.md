@@ -13,7 +13,7 @@ Il software elabora in tempo reale i profili spettrali di frutti (pomodori stand
 ## System Architecture & Workflow
 
 L'architettura software è strutturata in tre stadi modulari e disaccoppiati, progettati per trasformare il segnale ottico grezzo in codice nativo per microcontrollori o PLC industriali:
-
+'''text
 [ Line-Scan Optical Sensor ]
              |
              v
@@ -40,7 +40,7 @@ L'architettura software è strutturata in tre stadi modulari e disaccoppiati, pr
 ---
 
 ## Repository Structure
-
+'''text
 TOMATO-GRADING-ML/
 │
 ├── .gitignore                              # Esclusione di ambienti virtuali e file di sistema
