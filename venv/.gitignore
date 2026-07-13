@@ -1,0 +1,9 @@
+# Python Virtual Environment
+venv/
+env/
+*.pyc
+__pycache__/
+
+# OS generated files
+.DS_Store
+Thumbs.db
