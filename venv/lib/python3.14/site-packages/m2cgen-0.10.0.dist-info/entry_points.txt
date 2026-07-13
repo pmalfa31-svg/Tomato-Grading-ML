@@ -1,0 +1,3 @@
+[console_scripts]
+m2cgen = m2cgen.cli:main
+
