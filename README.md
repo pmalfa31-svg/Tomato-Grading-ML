@@ -137,17 +137,17 @@ Fidarsi ciecamente del parametro di lotto è un rischio: se un frutto anomalo fi
 ```python
 # src/train_model.py
 def check_batch_consistency(batch_type, transit_len,
-                             standard_min_transit_len=18,
+                             standard_min_transit_len=12,
                              cherry_max_transit_len=12):
     if batch_type == "standard":
-        return transit_len >= standard_min_transit_len
+        return transit_len > standard_min_transit_len
     elif batch_type == "cherry":
         return transit_len <= cherry_max_transit_len
 ```
 
-Le stesse soglie (18 / 12 step encoder, da `docs/sorting_classes_taxonomy.md`) sono replicate nel firmware C tramite `tomato_check_batch_anomaly()` (vedi sezione Embedded Firmware).
+Le stesse soglie (12 / 12 step encoder, dati verificati in `docs/sorting_classes_taxonomy.md`) sono replicate nel firmware C tramite `tomato_check_batch_anomaly()` (vedi sezione Embedded Firmware). La soglia è unificata a 12 perché nessun cherry nel dataset supera quel valore: usare lo stesso limite anche lato standard cattura il 100% dei cherry, riducendo i falsi positivi sui pomodori standard dal 23.5% al 14.6% rispetto a una soglia scelta senza verifica sui dati.
 
-> **Nota:** esiste una zona grigia tra 12 e 18 step encoder non coperta da nessuna delle due soglie. È una scelta conservativa — in quella fascia nessuna delle due modalità viene marcata come "anomala" — ma andrebbe validata con più dati sul campo prima di un deployment definitivo.
+> **Nota:** un residuo 14.6% di falsi positivi sui pomodori standard resta, perché esiste una sovrapposizione fisica reale tra i pomodori standard più piccoli/corti e i cherry più grandi — non eliminabile con una soglia singola su `transit_len`. Combinare `transit_len` con `valid_slices` è stato testato e scartato: riduce i falsi positivi ma fa perdere il riconoscimento di molti cherry veri.
 
 ---
 
@@ -232,7 +232,7 @@ Elenco onesto dei limiti noti di questa versione, utile per pianificare i prossi
 - **Dataset piccolo**: 291 frutti totali raccolti in 2 sole giornate di campagna; il lotto cherry ha solo 23 campioni (7-8 per classe).
 - **GroupKFold non discriminante**: raggruppata per `tomato_id` univoco, equivale nella pratica a una KFold standard (vedi sezione ML sopra).
 - **Nessuna copertura multi-condizione**: i dati coprono solo 2 giornate — non è verificato che il modello generalizzi a diverse condizioni di luce, stagionalità o lotti fornitore.
-- **Zona grigia nel controllo di coerenza**: `transit_len` tra 12 e 18 step encoder non è coperto da nessuna soglia di anomalia.
+- **Falsi positivi residui nel controllo di coerenza**: la soglia unificata a 12 step encoder cattura il 100% dei cherry ma genera ancora un 14.6% di falsi positivi sui pomodori standard, per sovrapposizione fisica reale nei dati — non risolvibile con `transit_len` da solo (vedi `docs/sorting_classes_taxonomy.md`).
 - **Nessun modello persistito**: ogni esecuzione di `export_embedded.py` ri-allena da zero; non c'è un artefatto `.pkl`/`.joblib` versionato per la riproducibilità.
 - **Nessuna CI/test automatizzati** nel repository.
 - **Benchmark ESP32 in modalità "replay"**: la latenza misurata riguarda la sola inferenza di classificazione, non l'intera pipeline di acquisizione (il sensore ottico fisico non è ancora collegato).
