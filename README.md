@@ -176,6 +176,12 @@ Il limite reale non è la formula di cross-validation, è che il modello non è 
 
 Esegui `python3 src/train_model.py` per rigenerare questi numeri sul dataset corrente — lo script stampa anche la matrice di confusione e la classifica delle feature più discriminanti per ciascun lotto.
 
+![Matrici di confusione](docs/images/confusion_matrices.png)
+
+La fonte di errore più grande nel modello standard è tra **Rosso-Arancio e Rosso Standard** (19 scambi su 38 casi reali di Rosso-Arancio): il modello sbaglia soprattutto tra stadi di maturazione *adiacenti*, non a caso — coerente col fatto che la maturazione è uno spettro continuo, non categorie nettamente separate.
+
+![Feature importance](docs/images/feature_importance.png)
+
 ---
 
 ## Embedded Firmware Export (C/C++)
