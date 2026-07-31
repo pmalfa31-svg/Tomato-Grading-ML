@@ -1,4 +1,5 @@
 #include "esp_timer.h"
+#include<Arduino.h>
 
 // ==========================================================================
 // Dichiarazioni extern "C": le funzioni vere e proprie (score_standard,
@@ -63,9 +64,18 @@ TestCase test_cases[] = {
 };
 const int N_CASES = sizeof(test_cases) / sizeof(test_cases[0]);
 
-void setup() {
-    Serial.begin(115200);
-    delay(2000);
+// ==========================================================================
+// Il task FreeRTOS di default (loopTask, che esegue setup()/loop()) ha uno
+// stack di soli 8KB su Arduino-ESP32. La funzione score_standard()/score_cherry()
+// generata da m2cgen usa moltissimi array temporanei allocati sullo stack
+// (compound literal C99 dentro memcpy, 1145 occorrenze nell'header per 35
+// alberi x 2 modelli) e supera facilmente quel budget -> stack overflow.
+//
+// Fix: eseguiamo il benchmark in un task FreeRTOS dedicato, con uno stack
+// esplicito che controlliamo noi (32KB), invece di affidarci alla dimensione
+// di default di loopTask.
+// ==========================================================================
+void benchmark_task(void *pvParameters) {
     Serial.println("=== Tomato Classifier - ESP32 Latency Benchmark ===");
     Serial.println("(replay offline di feature reali, senza sensore ottico fisico)\n");
 
@@ -101,8 +111,24 @@ void setup() {
     Serial.println("");
     Serial.printf("Accuratezza sui casi di test: %d/%d\n", correct, N_CASES);
     Serial.printf("Latenza media di inferenza (tutte le classi): %.2f us\n", total_latency_us / N_CASES);
+    Serial.printf("Stack massimo usato dal task (words residue, piu' basso = piu' vicino all'overflow): %d\n",
+        uxTaskGetStackHighWaterMark(NULL));
+
+    vTaskDelete(NULL);  // il task termina qui, il benchmark gira una volta sola
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(2000);
+
+    // Stack di 32KB (32768 byte), Core 1, priorita' 1 -- ben oltre il fabbisogno
+    // stimato, per avere margine. Se serve stringere per risparmiare RAM in
+    // futuro, guarda il valore stampato da uxTaskGetStackHighWaterMark() sopra
+    // e riduci di conseguenza (quel numero e' in "words" da 4 byte su ESP32,
+    // quindi moltiplicalo x4 per sapere quanti byte di stack sono avanzati).
+    xTaskCreatePinnedToCore(benchmark_task, "benchmark_task", 32768, NULL, 1, NULL, 1);
 }
 
 void loop() {
-    // niente da fare in loop, il benchmark gira una volta in setup()
+    vTaskDelay(pdMS_TO_TICKS(1000));  // loopTask resta vivo ma non fa nulla
 }
