@@ -159,7 +159,11 @@ Il motore di inferenza è un `RandomForestClassifier` (`n_estimators=35`, `max_d
 
 ### Cross-Validation Protocol
 
-La validazione usa `GroupKFold` a 5 split, raggruppata per `tomato_id`. **Nota per la manutenzione futura:** dato che `tomato_id` è un identificativo univoco per ogni riga del dataset processato, questa GroupKFold è nella pratica equivalente a una KFold standard — non previene alcun leakage aggiuntivo rispetto a un semplice split casuale. Per misurare davvero la capacità di generalizzazione a condizioni mai viste (illuminazione, lotto, giornata di raccolta), andrebbe raggruppata per giornata di campagna o per file sorgente. Questo è un miglioramento pianificato, non ancora implementato in questa versione.
+La validazione usa `GroupKFold` a 5 split, raggruppata per `tomato_id`. Dato che ogni frutto fisico viene scansionato una sola volta, `tomato_id` è univoco per riga: questa GroupKFold è nella pratica equivalente a una KFold standard.
+
+Questa è una scelta consapevole, non un limite da correggere: non c'è rischio di leakage classico (nessun frutto fisico compare due volte nel dataset), e raggruppare per giornata di campagna — l'alternativa più rigorosa in teoria — **non è applicabile a questo dataset**: 6 classi su 8 esistono in una sola delle due giornate di raccolta (le tre classi cherry esistono solo nel giorno 2, tre classi standard intermedie solo nel giorno 1). Tenere fuori una giornata intera per validare azzererebbe il training set proprio di quelle classi.
+
+Il limite reale non è la formula di cross-validation, è che il modello non è mai stato validato su condizioni di raccolta diverse (luce, calibrazione, lotto) per la maggior parte delle classi — servono più campagne di raccolta sul campo, non un altro split.
 
 ### Operational Performance (Out-of-Fold, dati reali)
 
@@ -230,7 +234,7 @@ Il vincolo `max_depth=6` garantisce al massimo 6 confronti condizionali **per si
 Elenco onesto dei limiti noti di questa versione, utile per pianificare i prossimi passi:
 
 - **Dataset piccolo**: 291 frutti totali raccolti in 2 sole giornate di campagna; il lotto cherry ha solo 23 campioni (7-8 per classe).
-- **GroupKFold non discriminante**: raggruppata per `tomato_id` univoco, equivale nella pratica a una KFold standard (vedi sezione ML sopra).
+- **Copertura multi-giornata incompleta**: 6 classi su 8 esistono in una sola delle due giornate di raccolta disponibili, quindi il modello non è mai stato validato su condizioni diverse (luce, calibrazione, lotto) per la maggior parte delle classi — non risolvibile riorganizzando la cross-validation, serve più campagne sul campo (vedi sezione ML sopra).
 - **Nessuna copertura multi-condizione**: i dati coprono solo 2 giornate — non è verificato che il modello generalizzi a diverse condizioni di luce, stagionalità o lotti fornitore.
 - **Falsi positivi residui nel controllo di coerenza**: la soglia unificata a 12 step encoder cattura il 100% dei cherry ma genera ancora un 14.6% di falsi positivi sui pomodori standard, per sovrapposizione fisica reale nei dati — non risolvibile con `transit_len` da solo (vedi `docs/sorting_classes_taxonomy.md`).
 - **Nessun modello persistito**: ogni esecuzione di `export_embedded.py` ri-allena da zero; non c'è un artefatto `.pkl`/`.joblib` versionato per la riproducibilità.

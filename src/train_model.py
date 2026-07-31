@@ -111,6 +111,19 @@ def train_and_evaluate_model(data_dir="data/raw", batch_type="standard", n_split
     )
 
     # 4. Validazione incrociata con GroupKFold
+    #
+    # NOTA: tomato_id e' univoco per ogni riga (ogni frutto fisico e' scansionato
+    # una sola volta), quindi questa GroupKFold e' nella pratica equivalente a una
+    # KFold standard. E' una scelta consapevole, non un limite da sistemare: NON
+    # c'e' rischio di leakage classico (nessun frutto fisico compare due volte nel
+    # dataset), e raggruppare per giornata di campagna non e' applicabile qui --
+    # 6 classi su 8 esistono in UNA SOLA delle due giornate di raccolta (es. le
+    # classi cherry esistono solo nel giorno 2), quindi "tenere fuori una giornata"
+    # per validare azzererebbe il training set di quelle classi.
+    #
+    # Il vero limite non e' la formula di cross-validation: e' che il modello non
+    # e' mai stato validato su condizioni di raccolta diverse per la maggior parte
+    # delle classi. Serve piu' campagne di raccolta, non un altro split.
     if verbose:
         print(f"\n[INFO] Esecuzione Cross-Validation (GroupKFold a {effective_splits} split)...")
     gkf = GroupKFold(n_splits=effective_splits)
