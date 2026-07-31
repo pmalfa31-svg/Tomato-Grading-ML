@@ -223,9 +223,22 @@ firmware/tomato_esp32_test/
 └── tomato_classifier.h     # Firmware generato
 ```
 
+### ⚠️ Stack size su FreeRTOS/ESP32
+
+Le funzioni generate da m2cgen usano centinaia di array temporanei allocati sullo stack (uno per ogni compound literal C99, ~1145 nell'header attuale). Il task di default che esegue `setup()`/`loop()` su Arduino-ESP32 (`loopTask`) ha solo **8KB** di stack — insufficiente, va in stack overflow alla prima chiamata a `score_standard()`. `tomato_esp32_test.ino` mostra la soluzione: eseguire l'inferenza in un task FreeRTOS dedicato con uno stack esplicito più ampio (`xTaskCreatePinnedToCore(..., 32768, ...)`), invece di fare affidamento sullo stack di default.
+
 ### Latenza — misurata, non dichiarata
 
-Il vincolo `max_depth=6` garantisce al massimo 6 confronti condizionali **per singolo albero**; con `n_estimators=35`, una singola inferenza valuta fino a 35 alberi e ne somma i voti. Piuttosto che dedurre la latenza dalla sola profondità dell'albero, `firmware/tomato_esp32_test/` esegue un benchmark reale su hardware ESP32: 16 frutti reali (2 per ciascuna delle 8 classi), predizioni verificate contro l'output del modello Python, latenza media misurata con `esp_timer_get_time()` su migliaia di ripetizioni.
+Il vincolo `max_depth=6` garantisce al massimo 6 confronti condizionali **per singolo albero**; con `n_estimators=35`, una singola inferenza valuta fino a 35 alberi e ne somma i voti. Piuttosto che dedurre la latenza dalla sola profondità dell'albero, `firmware/tomato_esp32_test/` esegue un benchmark reale su hardware ESP32: 16 frutti reali (2 per ciascuna delle 8 classi), predizioni verificate contro l'output del modello Python, latenza media misurata su 2000 ripetizioni per campione.
+
+**Risultati reali (ESP32, misurati con `esp_timer_get_time()`):**
+
+| Modello | Latenza media | Note |
+|---|---|---|
+| STANDARD (5 classi) | ~220-550 µs | Alberi sempre a profondità massima (6) — 28.6 foglie medie |
+| CHERRY (3 classi) | ~43-49 µs | Alberi molto più corti (profondità media 2.77) — dataset di training troppo piccolo (23 campioni) perché l'algoritmo trovi altro da tagliare oltre 2-3 livelli |
+
+Anche il caso peggiore misurato (~550 µs) è ampiamente entro i margini per un sistema in tempo reale su nastro trasportatore — l'inferenza da sola userebbe una frazione minima di qualunque budget di ciclo realistico per questa applicazione.
 
 ---
 
