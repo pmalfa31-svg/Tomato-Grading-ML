@@ -224,10 +224,16 @@ Un esempio funzionante di questo schema, verificato end-to-end su hardware ESP32
 
 ```text
 firmware/tomato_esp32_test/
-├── tomato_esp32_test.ino   # Sketch C++ — nessuna sintassi C99, solo dichiarazioni extern "C"
+├── tomato_esp32_test.cpp   # Sketch C++ (non .ino — vedi nota sotto) — solo dichiarazioni extern "C"
 ├── tomato_core.c           # Unità di compilazione C pura — #include "tomato_classifier.h"
 └── tomato_classifier.h     # Firmware generato
 ```
+
+> **Perché `.cpp` e non `.ino`:** il preprocessore "sketch" di Arduino/PlatformIO genera automaticamente i prototipi delle funzioni e li inserisce in cima al file, *prima* che i tipi custom (come `struct TestCase`) siano stati definiti — con parametri passati per riferimento a una struct, questo produce errori di compilazione (`'TestCase' was not declared in this scope`). Usare `.cpp` disattiva questo preprocessore e il file compila nell'ordine in cui è scritto, senza sorprese.
+
+**Demo hardware completa:** oltre al benchmark di latenza, lo sketch pilota due LED (rosso = scarto, verde = conforme) e un piccolo OLED I2C 128x64 che anima il passaggio del pomodoro sul nastro fino al "sensore", dove scatta l'inferenza vera. Include un interruttore a tempo di compilazione (`FAST_VERIFY_MODE`) per passare da una modalità rapida di verifica (via seriale, per il debug) a una più lenta e leggibile pensata per essere filmata.
+
+**Prova la demo dal browser, senza hardware:** [wokwi.com/projects/471166580602582017](https://wokwi.com/projects/471166580602582017) — simulazione interattiva completa (ESP32 + OLED + LED), stesso codice del firmware reale. Utile per esplorare il progetto senza possedere una scheda, ma i tempi di latenza mostrati in simulazione **non sono rappresentativi** di quelli reali (vedi sotto) — per quello, fare riferimento solo ai numeri misurati sull'hardware fisico.
 
 ### ⚠️ Stack size su FreeRTOS/ESP32
 
@@ -299,9 +305,15 @@ model, feature_cols, df = train_and_evaluate_model("data/raw", batch_type="stand
 ### 3. Benchmark su Hardware Reale (ESP32)
 
 ```bash
-# Apri firmware/tomato_esp32_test/tomato_esp32_test.ino in Arduino IDE
-# (richiede il supporto board ESP32, nessuna libreria esterna)
-# Upload, poi Monitor Seriale a 115200 baud
+# Progetto PlatformIO: metti i 3 file di firmware/tomato_esp32_test/ in src/ e include/
+# lib_deps richiesti in platformio.ini:
+#   adafruit/Adafruit SSD1306@^2.5.7
+#   adafruit/Adafruit GFX Library@^1.11.5
+pio run --target upload
+pio device monitor   # 115200 baud
+
+# In alternativa, prova la demo dal browser senza hardware:
+# https://wokwi.com/projects/471166580602582017
 ```
 
 ---
