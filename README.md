@@ -1,6 +1,8 @@
 # Real-Time Optical Sorting ML Pipeline
 **Automated Tomato Grading & Classification System for High-Speed Conveyor Lines**
 
+![Tests](https://github.com/pmalfa31-svg/Tomato-Grading-ML/actions/workflows/tests.yml/badge.svg)
+
 ---
 
 ## Executive Summary
@@ -253,6 +255,20 @@ Il vincolo `max_depth=6` garantisce al massimo 6 confronti condizionali **per si
 Anche il caso peggiore misurato (~550 µs) è ampiamente entro i margini per un sistema in tempo reale su nastro trasportatore — l'inferenza da sola userebbe una frazione minima di qualunque budget di ciclo realistico per questa applicazione.
 
 ---
+
+## Testing
+
+```bash
+pip install -r requirements-dev.txt
+python3 -m pytest tests/ -v
+```
+
+19 test, eseguiti automaticamente ad ogni push/PR (vedi badge in cima). Non sono test generici: diversi codificano esplicitamente i bug reali trovati durante lo sviluppo di questo progetto, così che se vengono reintrodotti per errore il test fallisce subito invece di scoprirlo su hardware:
+
+- `is_cherry` non può mai ricomparire tra le feature di training (il bug di data leakage originale)
+- la soglia di coerenza (12 step encoder) deve catturare il 100% dei cherry reali del dataset
+- il confine esatto della soglia (`transit_len == 12`) deve finire dal lato giusto — è il bordo che nella prima versione avrebbe dimezzato il rilevamento dei cherry
+- l'header C generato deve **compilare davvero** con `gcc`, non solo "sembrare" corretto
 
 ## Known Limitations
 

@@ -1,0 +1,3 @@
+# Dipendenze aggiuntive per sviluppo/test (non necessarie per usare la pipeline)
+-r requirements.txt
+pytest>=7.4.0
