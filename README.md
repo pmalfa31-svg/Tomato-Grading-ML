@@ -278,8 +278,6 @@ Elenco onesto dei limiti noti di questa versione, utile per pianificare i prossi
 - **Copertura multi-giornata incompleta**: 6 classi su 8 esistono in una sola delle due giornate di raccolta disponibili, quindi il modello non è mai stato validato su condizioni diverse (luce, calibrazione, lotto) per la maggior parte delle classi — non risolvibile riorganizzando la cross-validation, serve più campagne sul campo (vedi sezione ML sopra).
 - **Nessuna copertura multi-condizione**: i dati coprono solo 2 giornate — non è verificato che il modello generalizzi a diverse condizioni di luce, stagionalità o lotti fornitore.
 - **Falsi positivi residui nel controllo di coerenza**: la soglia unificata a 12 step encoder cattura il 100% dei cherry ma genera ancora un 14.6% di falsi positivi sui pomodori standard, per sovrapposizione fisica reale nei dati — non risolvibile con `transit_len` da solo (vedi `docs/sorting_classes_taxonomy.md`).
-- **Nessun modello persistito**: ogni esecuzione di `export_embedded.py` ri-allena da zero; non c'è un artefatto `.pkl`/`.joblib` versionato per la riproducibilità.
-- **Nessuna CI/test automatizzati** nel repository.
 - **Benchmark ESP32 in modalità "replay"**: la latenza misurata riguarda la sola inferenza di classificazione, non l'intera pipeline di acquisizione (il sensore ottico fisico non è ancora collegato).
 
 ---
