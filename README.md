@@ -55,9 +55,14 @@ Il sistema è progettato attorno a un vincolo operativo reale della linea: **ogn
 ```text
 TOMATO-GRADING-ML/
 │
+├── .github/
+│   └── workflows/
+│       └── tests.yml                       # CI: esegue tests/ ad ogni push/PR
+│
 ├── .gitignore
 ├── LICENSE
 ├── requirements.txt
+├── requirements-dev.txt                    # Aggiunge pytest, solo per sviluppo/test
 ├── README.md                               # Questo documento
 │
 ├── data/
@@ -67,21 +72,32 @@ TOMATO-GRADING-ML/
 │   └── photos/                             # Riferimenti visivi e campioni per classificazione
 │
 ├── docs/
-│   └── sorting_classes_taxonomy.md         # Tassonomia delle 8 classi e logica di scarto pneumatico
+│   ├── sorting_classes_taxonomy.md         # Tassonomia delle 8 classi e logica di scarto pneumatico
+│   └── images/                             # Grafici (confusion matrix, feature importance) usati nel README
 │
 ├── firmware/
 │   └── tomato_esp32_test/                  # Sketch di benchmark su ESP32 (latenza reale su hardware)
-│       ├── tomato_esp32_test.ino
+│       ├── tomato_esp32_test.cpp
 │       ├── tomato_core.c
 │       └── tomato_classifier.h
 │
 ├── include/
 │   └── tomato_classifier.h                 # Firmware C/C++ generato (2 modelli, batch mode esplicito)
 │
-└── src/
-    ├── data_loader.py                      # Pulizia, filtrazione hardware e sessionization
-    ├── train_model.py                      # Training per-lotto e validazione GroupKFold
-    └── export_embedded.py                  # Traduttore modello -> codice embedded C
+├── models/
+│   ├── model_standard_metadata.json        # Metadati modello (data training, n. campioni) -- il .pkl e' gitignored
+│   └── model_cherry_metadata.json
+│
+├── src/
+│   ├── data_loader.py                      # Pulizia, filtrazione hardware e sessionization
+│   ├── train_model.py                      # Training per-lotto, validazione GroupKFold, persistenza modello
+│   └── export_embedded.py                  # Traduttore modello -> codice embedded C
+│
+└── tests/
+    ├── conftest.py
+    ├── test_data_loader.py
+    ├── test_train_model.py
+    └── test_export_embedded.py             # Include un test che compila l'header C con gcc
 ```
 
 ---
@@ -239,7 +255,7 @@ firmware/tomato_esp32_test/
 
 ### ⚠️ Stack size su FreeRTOS/ESP32
 
-Le funzioni generate da m2cgen usano centinaia di array temporanei allocati sullo stack (uno per ogni compound literal C99, ~1145 nell'header attuale). Il task di default che esegue `setup()`/`loop()` su Arduino-ESP32 (`loopTask`) ha solo **8KB** di stack — insufficiente, va in stack overflow alla prima chiamata a `score_standard()`. `tomato_esp32_test.ino` mostra la soluzione: eseguire l'inferenza in un task FreeRTOS dedicato con uno stack esplicito più ampio (`xTaskCreatePinnedToCore(..., 32768, ...)`), invece di fare affidamento sullo stack di default.
+Le funzioni generate da m2cgen usano centinaia di array temporanei allocati sullo stack (uno per ogni compound literal C99, ~1145 nell'header attuale). Il task di default che esegue `setup()`/`loop()` su Arduino-ESP32 (`loopTask`) ha solo **8KB** di stack — insufficiente, va in stack overflow alla prima chiamata a `score_standard()`. `tomato_esp32_test.cpp` mostra la soluzione: eseguire l'inferenza in un task FreeRTOS dedicato con uno stack esplicito più ampio (`xTaskCreatePinnedToCore(..., 32768, ...)`), invece di fare affidamento sullo stack di default.
 
 ### Latenza — misurata, non dichiarata
 
@@ -275,8 +291,7 @@ python3 -m pytest tests/ -v
 Elenco onesto dei limiti noti di questa versione, utile per pianificare i prossimi passi:
 
 - **Dataset piccolo**: 291 frutti totali raccolti in 2 sole giornate di campagna; il lotto cherry ha solo 23 campioni (7-8 per classe).
-- **Copertura multi-giornata incompleta**: 6 classi su 8 esistono in una sola delle due giornate di raccolta disponibili, quindi il modello non è mai stato validato su condizioni diverse (luce, calibrazione, lotto) per la maggior parte delle classi — non risolvibile riorganizzando la cross-validation, serve più campagne sul campo (vedi sezione ML sopra).
-- **Nessuna copertura multi-condizione**: i dati coprono solo 2 giornate — non è verificato che il modello generalizzi a diverse condizioni di luce, stagionalità o lotti fornitore.
+- **Copertura multi-giornata incompleta**: i dati coprono solo 2 giornate di raccolta, e 6 classi su 8 esistono in una sola delle due — quindi il modello non è mai stato validato su condizioni diverse (luce, calibrazione, lotto, stagionalità) per la maggior parte delle classi. Non risolvibile riorganizzando la cross-validation, serve più campagne sul campo (vedi sezione ML sopra).
 - **Falsi positivi residui nel controllo di coerenza**: la soglia unificata a 12 step encoder cattura il 100% dei cherry ma genera ancora un 14.6% di falsi positivi sui pomodori standard, per sovrapposizione fisica reale nei dati — non risolvibile con `transit_len` da solo (vedi `docs/sorting_classes_taxonomy.md`).
 - **Benchmark ESP32 in modalità "replay"**: la latenza misurata riguarda la sola inferenza di classificazione, non l'intera pipeline di acquisizione (il sensore ottico fisico non è ancora collegato).
 
