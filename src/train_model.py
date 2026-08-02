@@ -1,4 +1,7 @@
 import os
+import json
+from datetime import datetime, timezone
+import joblib
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -216,11 +219,79 @@ def check_batch_consistency(batch_type, transit_len,
     raise ValueError(f"batch_type sconosciuto: {batch_type!r}")
 
 
+# ==========================================================================
+# PERSISTENZA DEL MODELLO
+# --------------------------------------------------------------------------
+# Prima di questa modifica, ogni esecuzione di export_embedded.py riallenava
+# da zero entrambi i modelli. Con random_state=42 fisso il risultato e'
+# deterministico, ma senza un artefatto salvato non c'e' modo di tracciare
+# QUALE versione del modello e' stata effettivamente validata/esportata,
+# ne' di riusarla senza rieseguire tutta la pipeline di training.
+# ==========================================================================
+
+def save_model(model, feature_cols, batch_type, df, model_dir="models"):
+    """
+    Salva il modello allenato (via joblib) insieme ai metadati necessari per
+    riprodurre/verificare cosa e' stato effettivamente esportato: le colonne
+    di feature nell'ordine giusto, la data di training, e la dimensione del
+    dataset usato.
+    """
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, f"model_{batch_type}.pkl")
+    meta_path = os.path.join(model_dir, f"model_{batch_type}_metadata.json")
+
+    joblib.dump(model, model_path)
+
+    metadata = {
+        "batch_type": batch_type,
+        "feature_cols": feature_cols,
+        "n_samples": len(df),
+        "n_classes": int(df["label"].nunique()),
+        "classes": sorted(int(c) for c in df["label"].unique()),
+        "trained_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "sklearn_random_state": model.random_state,
+        "n_estimators": model.n_estimators,
+        "max_depth": model.max_depth,
+    }
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"[INFO] Modello '{batch_type}' salvato in {model_path} ({len(df)} campioni, {metadata['n_classes']} classi)")
+    return model_path, meta_path
+
+
+def load_model(batch_type, model_dir="models"):
+    """
+    Carica un modello salvato in precedenza con save_model(). Solleva
+    FileNotFoundError con un messaggio chiaro se non esiste ancora --
+    il chiamante decide se questo e' un errore o un segnale per riallenare
+    (vedi export_embedded.py, che fa fallback automatico al training se
+    il modello cache non e' disponibile).
+    """
+    model_path = os.path.join(model_dir, f"model_{batch_type}.pkl")
+    meta_path = os.path.join(model_dir, f"model_{batch_type}_metadata.json")
+
+    if not os.path.exists(model_path) or not os.path.exists(meta_path):
+        raise FileNotFoundError(
+            f"Nessun modello salvato per batch_type={batch_type!r} in {model_dir}/. "
+            f"Esegui prima 'python3 src/train_model.py' per generarlo, oppure lascia "
+            f"che il chiamante riallenii da zero."
+        )
+
+    model = joblib.load(model_path)
+    with open(meta_path, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    return model, metadata["feature_cols"], metadata
+
+
 if __name__ == "__main__":
-    # Eseguiamo l'addestramento per ENTRAMBI i tipi di lotto da terminale
+    # Eseguiamo l'addestramento per ENTRAMBI i tipi di lotto da terminale,
+    # e salviamo ogni modello per riuso (vedi save_model/load_model sopra).
     results = {}
     for bt in BATCH_CONFIG:
         model, features, dataset = train_and_evaluate_model("data/raw", batch_type=bt)
+        save_model(model, features, bt, dataset)
         results[bt] = (model, features, dataset)
 
     print("[SUCCESS] Addestramento completato per entrambi i lotti (standard + cherry).")

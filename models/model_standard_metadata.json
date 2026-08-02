@@ -1,0 +1,36 @@
+{
+  "batch_type": "standard",
+  "feature_cols": [
+    "transit_len",
+    "valid_slices",
+    "IR1_mean",
+    "IR2_mean",
+    "Green_mean",
+    "Red_mean",
+    "Blue_mean",
+    "IR3_mean",
+    "SAT_mean",
+    "HUE_mean",
+    "IR1_std",
+    "Green_std",
+    "Red_std",
+    "SAT_std",
+    "HUE_std",
+    "Red_Green_ratio",
+    "IR1_IR2_ratio",
+    "IR3_IR2_ratio"
+  ],
+  "n_samples": 268,
+  "n_classes": 5,
+  "classes": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "trained_at_utc": "2026-08-02T11:25:08+00:00",
+  "sklearn_random_state": 42,
+  "n_estimators": 35,
+  "max_depth": 6
+}

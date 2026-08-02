@@ -2,8 +2,9 @@ import os
 import re
 import m2cgen as m2c
 
-# Importiamo dal modulo di training la configurazione lotto e le soglie di coerenza
-from train_model import train_and_evaluate_model, BATCH_CONFIG
+# Importiamo dal modulo di training la configurazione lotto, le soglie di
+# coerenza, e le funzioni di persistenza del modello
+from train_model import train_and_evaluate_model, BATCH_CONFIG, load_model, save_model
 
 # Soglie usate dal controllo di coerenza embedded (transit_len vs lotto dichiarato).
 # Fonte: docs/sorting_classes_taxonomy.md - "Regola di Identificazione del Calibro".
@@ -23,13 +24,33 @@ def _namespace_c_code(code: str, suffix: str) -> str:
     return code
 
 
-def _export_single_model(batch_type, data_dir="data/raw"):
+def _export_single_model(batch_type, data_dir="data/raw", use_cached=True, model_dir="models"):
     """
-    Addestra il modello per un solo tipo di lotto e prepara tutti i pezzi
-    C necessari (codice namespaced, elenco feature, mappa classi reali).
+    Prepara tutti i pezzi C necessari (codice namespaced, elenco feature,
+    mappa classi reali) per UN modello.
+
+    Se use_cached=True (default) prova prima a caricare un modello gia'
+    salvato con save_model() -- evita di riallenare da zero ad ogni export
+    e rende tracciabile QUALE modello e' stato effettivamente esportato
+    (vedi models/model_<batch_type>_metadata.json). Se non esiste ancora
+    nessun modello salvato, fa fallback automatico al training e lo salva
+    per la prossima volta.
     """
     cfg = BATCH_CONFIG[batch_type]
-    model, feature_cols, _ = train_and_evaluate_model(data_dir, batch_type=batch_type, verbose=True)
+
+    model = feature_cols = None
+    if use_cached:
+        try:
+            model, feature_cols, metadata = load_model(batch_type, model_dir=model_dir)
+            print(f"[INFO] Modello '{batch_type}' caricato da cache "
+                  f"(allenato il {metadata['trained_at_utc']}, {metadata['n_samples']} campioni). "
+                  f"Uso --retrain per riallenare da zero.")
+        except FileNotFoundError:
+            print(f"[INFO] Nessun modello in cache per '{batch_type}', alleno da zero...")
+
+    if model is None:
+        model, feature_cols, df = train_and_evaluate_model(data_dir, batch_type=batch_type, verbose=True)
+        save_model(model, feature_cols, batch_type, df, model_dir=model_dir)
 
     c_code_raw = m2c.export_to_c(model)
     c_code = _namespace_c_code(c_code_raw, batch_type)
@@ -49,7 +70,7 @@ def _export_single_model(batch_type, data_dir="data/raw"):
     }
 
 
-def export_model_to_cpp(data_dir="data/raw", header_dir="include"):
+def export_model_to_cpp(data_dir="data/raw", header_dir="include", use_cached=True):
     """
     Addestra i DUE modelli (standard e cherry) e li converte in un unico
     header C/C++ nativo (senza dipendenze) per l'esecuzione in tempo reale
@@ -64,8 +85,8 @@ def export_model_to_cpp(data_dir="data/raw", header_dir="include"):
     print("  AVVIO ESPORTAZIONE FIRMWARE C++ (2 modelli: standard/cherry)")
     print("==========================================================\n")
 
-    standard = _export_single_model("standard", data_dir)
-    cherry = _export_single_model("cherry", data_dir)
+    standard = _export_single_model("standard", data_dir, use_cached=use_cached)
+    cherry = _export_single_model("cherry", data_dir, use_cached=use_cached)
 
     # Le due pipeline (standard/cherry) derivano dalle stesse colonne del
     # dataset processato, quindi lo schema di feature deve combaciare:
@@ -258,4 +279,15 @@ inline int predict_tomato_class(TomatoBatchMode mode, double* input) {{
 
 
 if __name__ == "__main__":
-    export_model_to_cpp()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Esporta i modelli standard/cherry in un header C/C++ per firmware embedded."
+    )
+    parser.add_argument(
+        "--retrain", action="store_true",
+        help="Riallena da zero invece di usare i modelli in cache (models/*.pkl), e sovrascrive la cache."
+    )
+    args = parser.parse_args()
+
+    export_model_to_cpp(use_cached=not args.retrain)

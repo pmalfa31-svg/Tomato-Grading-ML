@@ -9,3 +9,9 @@ __pycache__/
 # File di sistema
 .DS_Store
 Thumbs.db
+
+# Modelli allenati (binari, rigenerabili con 'python3 src/train_model.py')
+# I metadata .json restano tracciati: sono piccoli, leggibili, utili per
+# sapere quando/su quanti campioni e' stato allenato l'ultimo modello
+# senza dover scaricare/aprire il binario.
+models/*.pkl
